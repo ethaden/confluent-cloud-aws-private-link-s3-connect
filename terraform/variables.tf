@@ -131,9 +131,15 @@ variable "postgres_user_password" {
     description = "The password of the user to provision in postgres"
 }
 
-variable "postgres_instance_name" {
+variable "postgres_database_instance_class" {
     type = string
-    default = "test"
+    default = "db.serverless"
+    description = "The Aurora RDS Instance type"
+}
+
+variable "postgres_database_name" {
+    type = string
+    default = "demo"
     description = "Name of the postgres database to create"
 }
 
@@ -141,4 +147,10 @@ variable "postgres_port" {
     type = number
     default = 5432
     description = "The port to be used by the postgres instance"
+}
+
+variable "use_ipv6" {
+    type = bool
+    default = false
+    description = "Set to true if using IPv6, false otherwise"
 }

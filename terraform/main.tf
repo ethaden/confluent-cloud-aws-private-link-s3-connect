@@ -45,7 +45,7 @@ resource "aws_security_group" "privatelink" {
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = [data.aws_vpc.vpc.cidr_block]
-    ipv6_cidr_blocks = [data.aws_vpc.vpc.ipv6_cidr_block]
+    ipv6_cidr_blocks = var.use_ipv6 ? [data.aws_vpc.vpc.ipv6_cidr_block] : null
   }
 
   ingress {
@@ -53,7 +53,7 @@ resource "aws_security_group" "privatelink" {
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = [data.aws_vpc.vpc.cidr_block]
-    ipv6_cidr_blocks = [data.aws_vpc.vpc.ipv6_cidr_block]
+    ipv6_cidr_blocks = var.use_ipv6 ? [data.aws_vpc.vpc.ipv6_cidr_block] : null
   }
 
   ingress {
@@ -61,7 +61,7 @@ resource "aws_security_group" "privatelink" {
     to_port     = 9092
     protocol    = "tcp"
     cidr_blocks = [data.aws_vpc.vpc.cidr_block]
-    ipv6_cidr_blocks = [data.aws_vpc.vpc.ipv6_cidr_block]
+    ipv6_cidr_blocks = var.use_ipv6 ? [data.aws_vpc.vpc.ipv6_cidr_block] : null
   }
 
   lifecycle {
