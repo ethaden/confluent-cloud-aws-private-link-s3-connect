@@ -12,6 +12,16 @@ resource "confluent_environment" "example_env" {
   }
 }
 
+data "confluent_schema_registry_cluster" "essentials" {
+  environment {
+    id = confluent_environment.example_env.id
+  }
+
+  depends_on = [
+    confluent_kafka_cluster.example_aws_private_link_cluster
+  ]
+}
+
 # Confluent Cloud Kafka Cluster
 
 # Set up a basic cluster (or a standard cluster, see below)
@@ -344,6 +354,23 @@ resource "confluent_api_key" "dynamodb_connector_key" {
         api_version = confluent_service_account.dynamodb_service_account.api_version
         kind = confluent_service_account.dynamodb_service_account.kind
     }
+}
+
+# Egress access point for connecting from CCloud to Postgres
+# TO BE FIXED! Not sure if vpc_endpoint_service_name is set correctly.
+# Also still missing: Egress DNS Setup, IAM Role setup (if necessary), ...
+resource "confluent_access_point" "postgres" {
+  display_name = "${local.resource_prefix}-postgres"
+  environment {
+    id = confluent_environment.example_env.id
+  }
+  gateway {
+    id = confluent_network.aws-private-link.gateway[0].id
+  }
+  aws_egress_private_link_endpoint {
+    #vpc_endpoint_service_name = "com.amazonaws.vpce.us-west-2.vpce-svc-00000000000000000"
+    vpc_endpoint_service_name = "com.amazonaws.${var.aws_region}.rds"
+  }
 }
 
 output "dynamodb_api_key" {

@@ -46,7 +46,62 @@ resource "aws_rds_cluster_instance" "postgres" {
   engine_version     = aws_rds_cluster.postgres.engine_version
   db_subnet_group_name = aws_db_subnet_group.subnet_group.name
   publicly_accessible = false
+  tags = local.confluent_tags
+
 }
+
+# We use RDS - a native AWS service and thus can use a simple configuration here where we point directly to the Azure service
+# TO BE FIXED!
+#resource "aws_vpc_endpoint" "postgres" {
+#  vpc_id       = data.aws_vpc.vpc.id
+#  service_name = "com.amazonaws.${var.aws_region}.rds"
+#}
+
+
+# For a custom service, something like the following needs to be done (not tested))
+# resource "aws_vpc_endpoint" "ptfe_service" {
+#   vpc_id            = data.aws_vpc.vpc.id
+#   service_name      = var.postgres_custom_service_name
+#   vpc_endpoint_type = "Interface"
+
+#   security_group_ids = [
+#     aws_security_group.postgres_vpc_endpoint.id,
+#   ]
+
+#   subnet_ids          = data.aws_subnets.vpc_subnets.ids
+#   private_dns_enabled = false
+# }
+
+# resource "aws_security_group" "postgres_vpc_endpoint" {
+#   name = "${local.resource_prefix}-postgres-vpc-endpoint"
+#   vpc_id = data.aws_vpc.vpc.id
+
+#   ingress {
+#     from_port   = var.postgres_port
+#     to_port     = var.postgres_port
+#     protocol    = "tcp"
+#     description = "PostgreSQL"
+#     cidr_blocks = [data.aws_vpc.vpc.cidr_block]
+#     ipv6_cidr_blocks = var.use_ipv6 ? [ data.aws_vpc.vpc.ipv6_cidr_block] : null
+#   }
+# }
+
+# resource "aws_route53_zone" "internal" {
+#   name = "vpc.internal."
+
+#   vpc {
+#     vpc_id = data.aws_vpc.vpc.id
+#   }
+# }
+
+# resource "aws_route53_record" "postgres_route53_record" {
+#   zone_id = aws_route53_zone.internal.zone_id
+#   name    = "postgres.${aws_route53_zone.internal.name}"
+#   type    = "CNAME"
+#   ttl     = "60"
+#   records = [aws_rds_cluster.postgres.endpoint]
+# }
+
 
 output "postgres_endpoint" {
     value = "${aws_rds_cluster.postgres.endpoint}"

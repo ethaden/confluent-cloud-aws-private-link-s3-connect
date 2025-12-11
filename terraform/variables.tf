@@ -149,6 +149,12 @@ variable "postgres_port" {
     description = "The port to be used by the postgres instance"
 }
 
+variable "postgres_custom_service_name" {
+    type = string
+    default = "vpc.internal.postgres"
+    description = "The custom service name for the postgres instance used in this demo"
+}
+
 variable "use_ipv6" {
     type = bool
     default = false
