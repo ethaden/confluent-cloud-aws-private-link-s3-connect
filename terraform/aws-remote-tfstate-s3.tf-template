@@ -2,7 +2,7 @@ terraform {
   backend "s3" {
     # TODO: Customize the name of this bucket (unfortunately, locals and variables are not allowed here)!
     bucket         = "<your-user-name>-tfstate-remote-s3"
-    key            = "example-confluent-cloud-mtls"
+    key            = "example-confluent-cloud-s3-connect"
     encrypt        = true
   }
 }

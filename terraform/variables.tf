@@ -120,39 +120,51 @@ variable "ccloud_cluster_generate_client_config_files" {
     description = "Set to true if you want to generate client configs with the created API keys under subfolder \"generated/client-configs\""
 }
 
-variable "postgres_user_name" {
+variable "aws_db_subnet_group_name" {
+    type = string
+    default = ""
+    description = "Optional: The name of AWS subnet group where the database and all related resources shall be located"
+}
+
+variable "database_username" {
     type = string
     default = "dbadmin"
     description = "The name of the user to provision in postgres"
 }
 
-variable "postgres_user_password" {
+variable "database_password" {
     type = string
     description = "The password of the user to provision in postgres"
 }
 
-variable "postgres_database_instance_class" {
+variable "database_instance_class" {
     type = string
     default = "db.serverless"
     description = "The Aurora RDS Instance type"
 }
 
-variable "postgres_database_name" {
+variable "database_name" {
     type = string
     default = "demo"
     description = "Name of the postgres database to create"
 }
 
-variable "postgres_port" {
+variable "database_port" {
     type = number
     default = 5432
     description = "The port to be used by the postgres instance"
 }
 
-variable "postgres_custom_service_name" {
+variable "database_custom_service_name" {
     type = string
-    default = "vpc.internal.postgres"
+    default = "vpc.internal.rds-db"
     description = "The custom service name for the postgres instance used in this demo"
+}
+
+variable "database_topic_profix" {
+    type = string
+    default = "rds-db"
+    description = "The topic prefix for the topic names to which the database connector will write"
 }
 
 variable "use_ipv6" {

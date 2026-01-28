@@ -9,3 +9,4 @@ aws_vpc_id = "VPC_ID"
 #postgres_user_name = "dbadmin"
 postgres_user_password = "password"
 #use_ipv6 = false
+#aws_db_subnet_group_name = 

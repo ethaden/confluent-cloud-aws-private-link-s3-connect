@@ -24,7 +24,7 @@ data "confluent_schema_registry_cluster" "essentials" {
 
 # Confluent Cloud Kafka Cluster
 
-# Set up a basic cluster (or a standard cluster, see below)
+# Set up a dedicted cluster
 resource "confluent_kafka_cluster" "example_aws_private_link_cluster" {
   display_name = var.ccloud_cluster_name
   availability = var.ccloud_cluster_availability
@@ -36,7 +36,7 @@ resource "confluent_kafka_cluster" "example_aws_private_link_cluster" {
   }
 
   network {
-    id = confluent_network.aws-private-link.id
+    id = confluent_network.network.id
   }
   environment {
     id = confluent_environment.example_env.id
@@ -47,8 +47,8 @@ resource "confluent_kafka_cluster" "example_aws_private_link_cluster" {
   }
 }
 
-resource "confluent_network" "aws-private-link" {
-  display_name     = "${local.resource_prefix}_aws_private_link_network"
+resource "confluent_network" "network" {
+  display_name     = "${local.resource_prefix}_network"
   cloud            = "AWS"
   region           = var.aws_region
   connection_types = ["PRIVATELINK"]
@@ -72,7 +72,7 @@ resource "confluent_private_link_access" "aws" {
     id = confluent_environment.example_env.id
   }
   network {
-    id = confluent_network.aws-private-link.id
+    id = confluent_network.network.id
   }
 
   lifecycle {
@@ -133,6 +133,12 @@ resource "confluent_api_key" "example_aws_private_link_api_key_sa_cluster_admin"
   lifecycle {
     prevent_destroy = false
   }
+  depends_on = [
+    confluent_private_link_access.aws,
+    aws_vpc_endpoint.aws-private-link-to-ccloud,
+    aws_route53_record.aws-private-link-to-ccloud,
+    aws_route53_record.aws-private-link-to-ccloud-zonal,
+  ]
 }
 
 # Assign the CloudClusterAdmin role to the cluster admin service account
@@ -173,6 +179,12 @@ resource "confluent_api_key" "example_aws_private_link_api_key_producer" {
   lifecycle {
     prevent_destroy = false
   }
+  depends_on = [
+    confluent_private_link_access.aws,
+    aws_vpc_endpoint.aws-private-link-to-ccloud,
+    aws_route53_record.aws-private-link-to-ccloud,
+    aws_route53_record.aws-private-link-to-ccloud-zonal,
+  ]
 }
 
 # For role bindings such as DeveloperRead and DeveloperWrite at least a standard cluster type would be required. We use ACLs instead for basic clusters
@@ -234,6 +246,12 @@ resource "confluent_api_key" "example_aws_private_link_api_key_consumer" {
   lifecycle {
     prevent_destroy = false
   }
+  depends_on = [
+    confluent_private_link_access.aws,
+    aws_vpc_endpoint.aws-private-link-to-ccloud,
+    aws_route53_record.aws-private-link-to-ccloud,
+    aws_route53_record.aws-private-link-to-ccloud-zonal,
+  ]
 }
 
 # For role bindings such as DeveloperRead and DeveloperWrite at least a standard cluster type would be required. Let's use ACLs instead
@@ -339,46 +357,4 @@ resource "local_sensitive_file" "client_config_files" {
   }
   )
   filename = "${var.generated_files_path}/client-${each.key}.conf"
-}
-
-resource "confluent_service_account" "dynamodb_service_account" {
-    display_name = "${local.resource_prefix}_dynamodb_sa"
-
-}
-
-resource "confluent_api_key" "dynamodb_connector_key" {
-    display_name = "${local.resource_prefix}_dynamodb_api_key"
-    description = "${local.resource_prefix} Service account"
-    owner {
-        id = confluent_service_account.dynamodb_service_account.id
-        api_version = confluent_service_account.dynamodb_service_account.api_version
-        kind = confluent_service_account.dynamodb_service_account.kind
-    }
-}
-
-# Egress access point for connecting from CCloud to Postgres
-# TO BE FIXED! Not sure if vpc_endpoint_service_name is set correctly.
-# Also still missing: Egress DNS Setup, IAM Role setup (if necessary), ...
-resource "confluent_access_point" "postgres" {
-  display_name = "${local.resource_prefix}-postgres"
-  environment {
-    id = confluent_environment.example_env.id
-  }
-  gateway {
-    id = confluent_network.aws-private-link.gateway[0].id
-  }
-  aws_egress_private_link_endpoint {
-    #vpc_endpoint_service_name = "com.amazonaws.vpce.us-west-2.vpce-svc-00000000000000000"
-    vpc_endpoint_service_name = "com.amazonaws.${var.aws_region}.rds"
-  }
-}
-
-output "dynamodb_api_key" {
-    description = "DynamoDB API Key"
-    value = confluent_api_key.dynamodb_connector_key.id
-}
-
-output "dynamodb_api_secret" {
-    description = "DynamoDB API Secret"
-    value = nonsensitive(confluent_api_key.dynamodb_connector_key.secret)
 }
