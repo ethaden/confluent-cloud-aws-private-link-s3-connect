@@ -14,3 +14,5 @@ terraform/.terraform.lock.hcl
 terraform/aws-remote-tfstate-s3.tf
 terraform/terraform.tfstate.backup
 terraform/generated
+.vscode/
+terraform/lambda_function_payload.zip

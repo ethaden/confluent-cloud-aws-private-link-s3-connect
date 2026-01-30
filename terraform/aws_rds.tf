@@ -46,7 +46,7 @@ resource "aws_rds_cluster_instance" "rds-db" {
   engine_version     = aws_rds_cluster.rds-db.engine_version
   db_subnet_group_name    = var.aws_db_subnet_group_name!="" ? var.aws_db_subnet_group_name : aws_db_subnet_group.subnet_group.name
   publicly_accessible = false
-  tags = local.confluent_tags
+  tags = local.extra_tags
 }
 
 

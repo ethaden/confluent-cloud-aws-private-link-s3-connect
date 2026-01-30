@@ -32,16 +32,39 @@ resource "aws_lb_listener" "rds-db" {
   }
 }
 
+resource "aws_lb_target_group_attachment" "cluster_initial_sync" {
+  target_group_arn = aws_lb_target_group.rds-db.arn
+  target_id        = data.aws_network_interface.rds_writer_eni.private_ip
+  port             = var.database_port
+
+  lifecycle {
+    # CRITICAL: Prevents Terraform from reverting the IP when the Lambda 
+    # function updates it after an Aurora failover.
+    ignore_changes = [target_id]
+  }
+}
+
 # The IP addresses of AWS RDS instances are dynamic, but load balancers need static IP addresses (or you need to update them each time the database starts using a new IP address)
 # Thus, it is recommended to use a proxy in front of the actual RDS instance
 # The Amazon RDS Proxy is very powerful, but too heavy for this use-case as it also implements its own authentication layer
 # Instead, we use a simple tcp forwarding proxy
 
-# resource "aws_lb_target_group_attachment" "rds-db" {
-#   target_group_arn = aws_lb_target_group.rds-db.arn
-#   target_id        = data.aws_network_interface.rds_db_eni[0].private_ip
-#   port             = var.database_port
-# }
+data "aws_db_instance" "writer_instance" {
+  db_instance_identifier = aws_rds_cluster.rds-db.replication_source_identifier != null ? aws_rds_cluster.rds-db.replication_source_identifier : tolist(aws_rds_cluster.rds-db.cluster_members)[0]
+}
+
+# 3. Find the ENI using a filter for the Writer Instance ID
+data "aws_network_interface" "rds_writer_eni" {
+  filter {
+    name   = "description"
+    values = ["RDSNetworkInterface", "RDS ${data.aws_db_instance.writer_instance.db_instance_identifier}"]
+  }
+
+  filter {
+    name   = "status"
+    values = ["in-use"]
+  }
+}
 
 locals {
   aws_rds_cluster_instance_rds_db_subnet = local.availability_zone_name_to_subnet_id[aws_rds_cluster_instance.rds-db.availability_zone]
@@ -179,13 +202,14 @@ resource "confluent_connector" "postgre-sql-cdc-source" {
     "connection.host"           = aws_rds_cluster_instance.rds-db.endpoint
     "connection.port"           = aws_rds_cluster_instance.rds-db.port
     "connection.user"           = var.database_username
+    "connection.password"       = var.database_password
     "ssl.mode"                  = "prefer"
     "db.name"                   = var.database_name
     "database.server.name"      = "${local.resource_prefix}-rds-db"
     "output.data.format"        = "AVRO",
     "tasks.max"                 = "1",
     "db.timezone"               = "UTC",
-    #"table.include.list"        = ".*",
+    "table.include.list"        = ".*",
     #"table.exclude.list"        = ".*",
     "topic.prefix"              = var.database_topic_profix
   }
@@ -196,6 +220,121 @@ resource "confluent_connector" "postgre-sql-cdc-source" {
     confluent_role_binding.database_service_account_developer_write,
     confluent_role_binding.database_service_account_sr_manage,
   ]
+}
+
+# This code will generate a lambda which checks and updates the load balancer target group IP addresses
+
+# 1. Write the Python code into a local file
+resource "local_file" "lambda_script" {
+  filename = "${path.module}/index.py"
+  content  = <<EOF
+import boto3, socket, os
+
+client = boto3.client('elbv2')
+
+def handler(event, context):
+    rds_endpoint = os.environ['RDS_ENDPOINT']
+    tg_arn = os.environ['TARGET_GROUP_ARN']
+    tn_port = os.environ['TARGET_GROUP_PORT']
+    
+    # 1. Resolve current IP
+    new_ip = socket.gethostbyname(rds_endpoint)
+    
+    # 2. Get currently registered targets
+    current_targets = client.describe_target_health(TargetGroupArn=tg_arn)
+    registered_ips = [t['Target']['Id'] for t in current_targets['TargetHealthDescriptions']]
+    
+    # 3. Update if IP changed
+    if new_ip not in registered_ips:
+        if registered_ips:
+            client.deregister_targets(TargetGroupArn=tg_arn, Targets=[{'Id': ip} for ip in registered_ips])
+        client.register_targets(TargetGroupArn=tg_arn, Targets=[{'Id': new_ip, 'Port': tn_port}])
+        print(f"Updated Target Group with new IP: {new_ip}")
+EOF
+}
+
+# 2. Create the ZIP archive from the generated file
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_file = local_file.lambda_script.filename
+  output_path = "${path.module}/lambda_function_payload.zip"
+
+  # Ensures the zip is only created after the file is written
+  depends_on = [local_file.lambda_script] 
+}
+
+resource "aws_lambda_function" "ip_updater" {
+  filename         = data.archive_file.lambda_zip.output_path
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256 # Triggers update on code change
+  function_name = "rds_ip_target_updater"
+  role          = aws_iam_role.lambda_exec.arn
+  handler       = "index.handler"
+  runtime       = "python3.9"
+
+  environment {
+    variables = {
+      RDS_ENDPOINT     = aws_rds_cluster_instance.rds-db.endpoint
+      TARGET_GROUP_ARN = aws_lb_target_group.rds-db.arn
+      TARGET_GROUP_PORT = var.database_port
+    }
+  }
+}
+
+resource "aws_cloudwatch_event_rule" "every_five_minutes" {
+  name                = "trigger-rds-ip-sync"
+  schedule_expression = "rate(5 minutes)"
+}
+
+resource "aws_cloudwatch_event_target" "sync_rds_ip" {
+  rule      = aws_cloudwatch_event_rule.every_five_minutes.name
+  target_id = "SyncRDSIP"
+  arn       = aws_lambda_function.ip_updater.arn
+}
+
+resource "aws_lambda_permission" "allow_cloudwatch" {
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.ip_updater.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.every_five_minutes.arn
+}
+
+resource "aws_iam_role_policy" "lambda_tg_policy" {
+  role = aws_iam_role.lambda_exec.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "elasticloadbalancing:RegisterTargets",
+        "elasticloadbalancing:DeregisterTargets",
+        "elasticloadbalancing:DescribeTargetHealth"
+      ]
+      Resource = aws_lb_target_group.rds-db.arn
+    }]
+  })
+}
+
+resource "aws_iam_role" "lambda_exec" {
+  name = "rds-target-updater-role"
+
+  # Trust policy allows Lambda service to use this role
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+    }]
+  })
+}
+
+# 2. Attach the standard AWS Basic Execution Role
+# This provides permissions for CloudWatch Logs
+resource "aws_iam_role_policy_attachment" "lambda_logs" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 

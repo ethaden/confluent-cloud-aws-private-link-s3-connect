@@ -93,7 +93,7 @@ resource "aws_route53_zone" "aws-private-link-to-ccloud" {
   vpc {
     vpc_id = data.aws_vpc.vpc.id
   }
-  tags = local.confluent_tags
+  tags = local.extra_tags
 }
 
 resource "aws_route53_record" "aws-private-link-to-ccloud" {

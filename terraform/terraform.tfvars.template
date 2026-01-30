@@ -10,3 +10,4 @@ aws_vpc_id = "VPC_ID"
 database_password = "password"
 #use_ipv6 = false
 #aws_db_subnet_group_name = 
+resource_prefix = 

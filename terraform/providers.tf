@@ -11,14 +11,14 @@ terraform {
 }
 
 provider "confluent" {
-  cloud_api_key    = local.confluent_creds.api_key
-  cloud_api_secret = local.confluent_creds.api_secret
+  #cloud_api_key    = local.confluent_creds.api_key
+  #cloud_api_secret = local.confluent_creds.api_secret
 }
 
 provider "aws" {
     region = var.aws_region
 
     default_tags {
-      tags = local.confluent_tags
+      tags = try (module.confluent_terraform_aws_csta_base_module.extra_tags, {})
     }
 }
