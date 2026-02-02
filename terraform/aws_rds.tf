@@ -1,5 +1,5 @@
 // AWS RDS DB
-resource "aws_security_group" "rds-db" {
+resource "aws_security_group" "rds_db" {
   name = "${local.resource_prefix}-rds-db"
   vpc_id = data.aws_vpc.vpc.id
 
@@ -18,7 +18,7 @@ resource "aws_db_subnet_group" "subnet_group" {
   subnet_ids = data.aws_subnets.vpc_subnets.ids
 }
 
-resource "aws_rds_cluster" "rds-db" {
+resource "aws_rds_cluster" "rds_db" {
   #vpc = 
   cluster_identifier      = "${local.resource_prefix}-rds-db"
   engine                  = "aurora-postgresql"
@@ -32,18 +32,18 @@ resource "aws_rds_cluster" "rds-db" {
   deletion_protection       = false  # Change to "true" in production!
   db_subnet_group_name    = var.aws_db_subnet_group_name!="" ? var.aws_db_subnet_group_name : aws_db_subnet_group.subnet_group.name
   skip_final_snapshot = true
-  vpc_security_group_ids = [ aws_security_group.rds-db.id ]
+  vpc_security_group_ids = [ aws_security_group.rds_db.id ]
   serverlessv2_scaling_configuration {
     max_capacity             = 1.0
     min_capacity             = 0.0
   }
 }
 
-resource "aws_rds_cluster_instance" "rds-db" {
-  cluster_identifier = aws_rds_cluster.rds-db.id
+resource "aws_rds_cluster_instance" "rds_db" {
+  cluster_identifier = aws_rds_cluster.rds_db.id
   instance_class     = var.database_instance_class
-  engine             = aws_rds_cluster.rds-db.engine
-  engine_version     = aws_rds_cluster.rds-db.engine_version
+  engine             = aws_rds_cluster.rds_db.engine
+  engine_version     = aws_rds_cluster.rds_db.engine_version
   db_subnet_group_name    = var.aws_db_subnet_group_name!="" ? var.aws_db_subnet_group_name : aws_db_subnet_group.subnet_group.name
   publicly_accessible = false
   tags = local.extra_tags
@@ -51,7 +51,7 @@ resource "aws_rds_cluster_instance" "rds-db" {
 
 
 output "database_endpoint" {
-    value = "${aws_rds_cluster.rds-db.endpoint}"
+    value = "${aws_rds_cluster.rds_db.endpoint}"
 }
 
 output "database_credentials" {

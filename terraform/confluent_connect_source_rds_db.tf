@@ -4,7 +4,7 @@
 # - corresponding dns entries in CCloud
 # - a source connector in Postgres mode
 
-resource "aws_lb_target_group" "rds-db" {
+resource "aws_lb_target_group" "rds_db" {
   name     = "${local.resource_prefix}-rds-db-elb-tg"
   port     = var.database_port
   protocol = "TCP"
@@ -12,7 +12,7 @@ resource "aws_lb_target_group" "rds-db" {
   vpc_id   = data.aws_vpc.vpc.id
 }
 
-resource "aws_lb" "rds-db" {
+resource "aws_lb" "rds_db" {
   name               = "${local.resource_prefix}-rds-db-lb"
   internal           = true
   load_balancer_type = "network"
@@ -21,19 +21,19 @@ resource "aws_lb" "rds-db" {
   enable_deletion_protection = false
 }
 
-resource "aws_lb_listener" "rds-db" {
-  load_balancer_arn = aws_lb.rds-db.arn
+resource "aws_lb_listener" "rds_db" {
+  load_balancer_arn = aws_lb.rds_db.arn
   port              = var.database_port
   protocol          = "TCP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.rds-db.arn
+    target_group_arn = aws_lb_target_group.rds_db.arn
   }
 }
 
-resource "aws_lb_target_group_attachment" "cluster_initial_sync" {
-  target_group_arn = aws_lb_target_group.rds-db.arn
+resource "aws_lb_target_group_attachment" "rds_db" {
+  target_group_arn = aws_lb_target_group.rds_db.arn
   target_id        = data.aws_network_interface.rds_writer_eni.private_ip
   port             = var.database_port
 
@@ -50,7 +50,8 @@ resource "aws_lb_target_group_attachment" "cluster_initial_sync" {
 # Instead, we use a simple tcp forwarding proxy
 
 data "aws_db_instance" "writer_instance" {
-  db_instance_identifier = aws_rds_cluster.rds-db.replication_source_identifier != null ? aws_rds_cluster.rds-db.replication_source_identifier : tolist(aws_rds_cluster.rds-db.cluster_members)[0]
+  db_instance_identifier = aws_rds_cluster.rds_db.replication_source_identifier != null ? aws_rds_cluster.rds_db.replication_source_identifier : tolist(aws_rds_cluster.rds_db.cluster_members)[0]
+  depends_on = [ aws_rds_cluster_instance.rds_db ]
 }
 
 # 3. Find the ENI using a filter for the Writer Instance ID
@@ -67,11 +68,11 @@ data "aws_network_interface" "rds_writer_eni" {
 }
 
 locals {
-  aws_rds_cluster_instance_rds_db_subnet = local.availability_zone_name_to_subnet_id[aws_rds_cluster_instance.rds-db.availability_zone]
+  aws_rds_cluster_instance_rds_db_subnet = local.availability_zone_name_to_subnet_id[aws_rds_cluster_instance.rds_db.availability_zone]
 }
 
-resource "aws_vpc_endpoint_service" "rds-db" {
-  network_load_balancer_arns = [aws_lb.rds-db.arn]
+resource "aws_vpc_endpoint_service" "rds_db" {
+  network_load_balancer_arns = [aws_lb.rds_db.arn]
   supported_ip_address_types = ["ipv4"]
   # Accept connections automatically, but only from the list of allowd principals
   acceptance_required        = false
@@ -99,39 +100,39 @@ resource "confluent_gateway" "gw" {
 #   }
 # }
 
-# resource "confluent_access_point" "rds-db" {
-#   display_name = "${local.resource_prefix}-rds-db"
-#   environment {
-#     id = confluent_environment.example_env.id
-#   }
-#   gateway {
-#     id = confluent_gateway.gw.id
-#   }
-#   aws_egress_private_link_endpoint {
-#     vpc_endpoint_service_name = aws_vpc_endpoint_service.rds-db.service_name
-#   }
-#   depends_on = [
-#     aws_vpc_endpoint_service.rds-db,
-#     aws_lb_target_group_attachment.rds-db,
-#    ]
-# }
+resource "confluent_access_point" "rds_db" {
+  display_name = "${local.resource_prefix}-rds-db"
+  environment {
+    id = confluent_environment.example_env.id
+  }
+  gateway {
+    id = confluent_gateway.gw.id
+  }
+  aws_egress_private_link_endpoint {
+    vpc_endpoint_service_name = aws_vpc_endpoint_service.rds_db.service_name
+  }
+  depends_on = [
+    aws_vpc_endpoint_service.rds_db,
+    aws_lb_target_group_attachment.rds_db,
+   ]
+}
 
-# resource "confluent_dns_record" "rds-db" {
-#   display_name = "rds-db"
-#   environment {
-#     id = confluent_environment.example_env.id
-#   }
-#   domain = aws_rds_cluster_instance.rds-db.endpoint
-#   gateway {
-#     id = confluent_gateway.gw.id
-#   }
-#   private_link_access_point {
-#     id = confluent_access_point.rds-db.id
-#   }
-#   depends_on = [ 
-#     aws_db_subnet_group.subnet_group
-#   ]
-# }
+resource "confluent_dns_record" "rds_db" {
+  display_name = "rds_db"
+  environment {
+    id = confluent_environment.example_env.id
+  }
+  domain = aws_rds_cluster_instance.rds_db.endpoint
+  gateway {
+    id = confluent_gateway.gw.id
+  }
+  private_link_access_point {
+    id = confluent_access_point.rds_db.id
+  }
+  depends_on = [ 
+    aws_db_subnet_group.subnet_group
+  ]
+}
 
 resource "confluent_service_account" "database_service_account" {
     display_name = "${local.resource_prefix}_database_sa"
@@ -199,8 +200,8 @@ resource "confluent_connector" "postgre-sql-cdc-source" {
     "connector.class"           = "PostgresSource"
     "kafka.auth.mode"           = "SERVICE_ACCOUNT"
     "kafka.service.account.id"  = confluent_service_account.database_service_account.id
-    "connection.host"           = aws_rds_cluster_instance.rds-db.endpoint
-    "connection.port"           = aws_rds_cluster_instance.rds-db.port
+    "connection.host"           = aws_rds_cluster_instance.rds_db.endpoint
+    "connection.port"           = aws_rds_cluster_instance.rds_db.port
     "connection.user"           = var.database_username
     "connection.password"       = var.database_password
     "ssl.mode"                  = "prefer"
@@ -215,7 +216,7 @@ resource "confluent_connector" "postgre-sql-cdc-source" {
   }
 
   depends_on = [
-    #confluent_access_point.rds-db,
+    confluent_access_point.rds_db,
     confluent_role_binding.database_service_account_developer_manage,
     confluent_role_binding.database_service_account_developer_write,
     confluent_role_binding.database_service_account_sr_manage,
@@ -273,8 +274,8 @@ resource "aws_lambda_function" "ip_updater" {
 
   environment {
     variables = {
-      RDS_ENDPOINT     = aws_rds_cluster_instance.rds-db.endpoint
-      TARGET_GROUP_ARN = aws_lb_target_group.rds-db.arn
+      RDS_ENDPOINT     = aws_rds_cluster_instance.rds_db.endpoint
+      TARGET_GROUP_ARN = aws_lb_target_group.rds_db.arn
       TARGET_GROUP_PORT = var.database_port
     }
   }
@@ -309,7 +310,7 @@ resource "aws_iam_role_policy" "lambda_tg_policy" {
         "elasticloadbalancing:DeregisterTargets",
         "elasticloadbalancing:DescribeTargetHealth"
       ]
-      Resource = aws_lb_target_group.rds-db.arn
+      Resource = aws_lb_target_group.rds_db.arn
     }]
   })
 }
@@ -337,6 +338,51 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# Also trigger on DNS update
+# Omitted in this demo, but recommended in practice. This is how you could implement it:
+# 1. Enable Cloud Trail (management events, write), 
+# 2. Configure cloud watch to trigger on updates of the DNS A record of the private endpoing of the RDS instance
+# 3. Call the same lambda used above 
+# resource "aws_cloudwatch_event_rule" "watch_rds_db_instance_dns_a_record_change" {
+#   name        = "trigger-on-specific-dns-update"
+#   description = "Triggers only when ${aws_rds_cluster_instance.rds_db.endpoint} A record is updated"
+
+#   event_pattern = jsonencode({
+#     source      = ["aws.route53"]
+#     detail-type = ["AWS API Call via CloudTrail"]
+#     detail = {
+#       eventSource = ["route53.amazonaws.com"]
+#       eventName   = ["ChangeResourceRecordSets"]
+#       requestParameters = {
+#         changeBatch = {
+#           changes = {
+#             resourceRecordSet = {
+#               # Matches the specific DNS entry (must include trailing dot)
+#               #name = [aws_rds_cluster_instance.rds_db.endpoint]
+#               type = ["A"]
+#             }
+#           }
+#         }
+#       }
+#     }
+#   })
+# }
+
+# # 2. Target your EXISTING Lambda
+# resource "aws_cloudwatch_event_target" "lambda_target" {
+#   rule      = aws_cloudwatch_event_rule.watch_rds_db_instance_dns_a_record_change.name
+#   target_id = "SyncRDSIP"
+#   arn       = aws_lambda_function.ip_updater.arn
+# }
+
+# # 3. Grant Invoke Permission
+# resource "aws_lambda_permission" "allow_eventbridge" {
+#   statement_id  = "AllowExecutionFromEventBridgeSpecific"
+#   action        = "lambda:InvokeFunction"
+#   function_name = aws_lambda_function.ip_updater.function_name
+#   principal     = "events.amazonaws.com"
+#   source_arn    = aws_cloudwatch_event_rule.watch_rds_db_instance_dns_a_record_change.arn
+# }
 
 # outputs
 

@@ -16,3 +16,4 @@ terraform/terraform.tfstate.backup
 terraform/generated
 .vscode/
 terraform/lambda_function_payload.zip
+terraform/index.py
