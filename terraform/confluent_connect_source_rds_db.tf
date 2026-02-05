@@ -12,6 +12,11 @@ resource "aws_lb_target_group" "rds_db" {
   vpc_id   = data.aws_vpc.vpc.id
 }
 
+# Important: If using a Single-AZ Confluent Cloud cluster as in this demo, you might face issues as 
+# AWS Network Load Balancers by default do not balance across AZs (because this is expensive).
+# You have to options in that case:
+# a) Make sure your CCLoud cluster and the RDS Instance are deployed in the same AZ, or
+# b) enable cross-zone load balancing (but please be aware of the extra costs)
 resource "aws_lb" "rds_db" {
   name               = "${local.resource_prefix}-rds-db-lb"
   internal           = true
@@ -19,6 +24,8 @@ resource "aws_lb" "rds_db" {
   subnets            = toset(data.aws_subnets.vpc_subnets.ids)
 
   enable_deletion_protection = false
+  # Default is false. Enable if your cluster and your egress instances are in different AZs.
+  enable_cross_zone_load_balancing = true
 }
 
 resource "aws_lb_listener" "rds_db" {
@@ -399,4 +406,9 @@ output "database_api_key" {
 output "database_api_secret" {
     description = "database API Secret"
     value = nonsensitive(confluent_api_key.database_connector_key.secret)
+}
+
+output "database_connection" {
+    description = "Instructions for manual connections to the database"
+    value = "Connect to the database by running: psql \"host=${aws_rds_cluster_instance.rds_db.endpoint} dbname=demo sslmode=prefer user=${var.database_username}  password=${var.database_password}\""
 }

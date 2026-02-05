@@ -14,6 +14,33 @@ You need the following to run this demo:
 
 ## Getting started
 
+Set the environment variables 
+
+Then run terraform:
+
+```console
+terraform apply
+```
+
+You should be able to connect to the database instance following the instructions shown by the terraform output.
+
+Create a table with data:
+
+```sql
+CREATE TABLE users (
+    user        char(20),
+    name        char(40),
+    givenname   char(40),
+    CONSTRAINT user_constraint PRIMARY KEY(user)
+);
+```
+
+Populate the table with data:
+
+```sql
+
+```
+
 
 == Wrapping things up
 
