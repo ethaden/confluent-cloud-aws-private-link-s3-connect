@@ -55,6 +55,7 @@ data "aws_db_instance" "writer_instance" {
 }
 
 # 3. Find the ENI using a filter for the Writer Instance ID
+# This needs to be fixed: Initially, the db_instance_identifier is null and terraform fails
 data "aws_network_interface" "rds_writer_eni" {
   filter {
     name   = "description"
@@ -65,6 +66,9 @@ data "aws_network_interface" "rds_writer_eni" {
     name   = "status"
     values = ["in-use"]
   }
+  depends_on = [ 
+    data.aws_db_instance.writer_instance
+   ]
 }
 
 locals {
@@ -76,29 +80,30 @@ resource "aws_vpc_endpoint_service" "rds_db" {
   supported_ip_address_types = ["ipv4"]
   # Accept connections automatically, but only from the list of allowd principals
   acceptance_required        = false
-  allowed_principals = [confluent_gateway.gw.aws_egress_private_link_gateway[0].principal_arn]
+  allowed_principals = [data.confluent_gateway.gw.aws_egress_private_link_gateway[0].principal_arn]
 }
 
 # Create a separate egress gateway instead of using the default one.
 # This is required for using custom connectors and thus is the better option here as it unlocks more features
-resource "confluent_gateway" "gw" {
- display_name = "${local.resource_prefix}-egress-gw"
- environment {
-   id = confluent_environment.example_env.id
- }
- aws_egress_private_link_gateway {
-   region = var.aws_region
- }
-}
+# Today, this serverless gateway cannot 
+# resource "confluent_gateway" "gw" {
+#  display_name = "${local.resource_prefix}-egress-gw"
+#  environment {
+#    id = confluent_environment.example_env.id
+#  }
+#  aws_egress_private_link_gateway {
+#    region = var.aws_region
+#  }
+# }
 
 # This is just an example for how to get the default gateway created automatically for every customer network in Confluent Cloud
 # We use a dedicated egress gateway instead here, for thre reasons stated above.
-# data "confluent_gateway" "main" {
-#   id = confluent_network.network.gateway[0].id
-#   environment {
-#     id = confluent_environment.example_env.id
-#   }
-# }
+data "confluent_gateway" "gw" {
+  id = confluent_network.network.gateway[0].id
+  environment {
+    id = confluent_environment.example_env.id
+  }
+}
 
 resource "confluent_access_point" "rds_db" {
   display_name = "${local.resource_prefix}-rds-db"
@@ -106,7 +111,7 @@ resource "confluent_access_point" "rds_db" {
     id = confluent_environment.example_env.id
   }
   gateway {
-    id = confluent_gateway.gw.id
+    id = data.confluent_gateway.gw.id
   }
   aws_egress_private_link_endpoint {
     vpc_endpoint_service_name = aws_vpc_endpoint_service.rds_db.service_name
@@ -124,7 +129,7 @@ resource "confluent_dns_record" "rds_db" {
   }
   domain = aws_rds_cluster_instance.rds_db.endpoint
   gateway {
-    id = confluent_gateway.gw.id
+    id = data.confluent_gateway.gw.id
   }
   private_link_access_point {
     id = confluent_access_point.rds_db.id
