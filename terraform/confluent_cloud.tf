@@ -22,6 +22,22 @@ data "confluent_schema_registry_cluster" "essentials" {
   ]
 }
 
+resource "confluent_network" "network" {
+  display_name     = "${local.resource_prefix}_network"
+  cloud            = "AWS"
+  region           = var.aws_region
+  connection_types = ["PRIVATELINK"]
+
+  #zones = local.availability_zone_ids
+  environment {
+    id = confluent_environment.example_env.id
+  }
+
+  lifecycle {
+    prevent_destroy = false
+  }
+}
+
 # Confluent Cloud Kafka Cluster
 
 # Set up a dedicted cluster
@@ -38,22 +54,6 @@ resource "confluent_kafka_cluster" "example_aws_private_link_cluster" {
   network {
     id = confluent_network.network.id
   }
-  environment {
-    id = confluent_environment.example_env.id
-  }
-
-  lifecycle {
-    prevent_destroy = false
-  }
-}
-
-resource "confluent_network" "network" {
-  display_name     = "${local.resource_prefix}_network"
-  cloud            = "AWS"
-  region           = var.aws_region
-  connection_types = ["PRIVATELINK"]
-
-  zones = local.availability_zone_ids
   environment {
     id = confluent_environment.example_env.id
   }

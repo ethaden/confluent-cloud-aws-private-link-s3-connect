@@ -92,6 +92,7 @@ variable "ccloud_cluster_availability" {
     }
 }
 
+
 variable "ccloud_cluster_ckus" {
     type = number
     default = 1

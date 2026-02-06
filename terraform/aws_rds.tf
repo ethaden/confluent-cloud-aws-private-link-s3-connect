@@ -46,7 +46,30 @@ resource "aws_rds_cluster_instance" "rds_db" {
   engine_version     = aws_rds_cluster.rds_db.engine_version
   db_subnet_group_name    = var.aws_db_subnet_group_name!="" ? var.aws_db_subnet_group_name : aws_db_subnet_group.subnet_group.name
   publicly_accessible = false
+    # Use the same availability zone as used for the SINGLE_ZONE CCloud cluster
+  availability_zone = local.availability_zone_map[confluent_kafka_cluster.example_aws_private_link_cluster.dedicated[0].zones[0]]
+
   tags = local.extra_tags
+}
+
+# Initialize the database with some test data
+resource "null_resource" "db_setup" {
+  depends_on = [aws_rds_cluster_instance.rds_db]
+
+  provisioner "local-exec" {
+    command = <<EOT
+      PGPASSWORD="${var.database_password}" psql -h ${aws_rds_cluster_instance.rds_db.endpoint} -U ${var.database_username} -d ${var.database_name} -c "
+        CREATE TABLE IF NOT EXISTS users (
+          username TEXT PRIMARY KEY, 
+          given_name TEXT, 
+          family_name TEXT,
+          timestamp TIMESTAMPTZ DEFAULT NOW()
+        );
+        INSERT INTO users VALUES('admin', 'Super', 'User', DEFAULT);
+        INSERT INTO users VALUES('user', 'Regular', 'User', DEFAULT);
+      "
+    EOT
+  }
 }
 
 

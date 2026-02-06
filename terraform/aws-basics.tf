@@ -30,6 +30,12 @@ locals {
   bootstrap_prefix = split(".", confluent_kafka_cluster.example_aws_private_link_cluster.bootstrap_endpoint)[0]
   zone_to_availability_zone_map = { for subnet in data.aws_subnet.vpc_subnet : subnet.id => subnet.availability_zone_id }
   availability_zone_name_to_subnet_id = { for subnet in data.aws_subnet.vpc_subnet : subnet.availability_zone => subnet.id }
+  # Create mapping of AWS Zone IDS to zone names, this will look something like this:
+  # availability_zone_map    = {
+  #    + euc1-az1 = "eu-central-1c"
+  #    + euc1-az2 = "eu-central-1a"
+  #    + euc1-az3 = "eu-central-1b"
+  #  }
   availability_zone_map = { for subnet in data.aws_subnet.vpc_subnet : subnet.availability_zone_id => subnet.availability_zone }
   availability_zone_ids = [ for subnet in data.aws_subnet.vpc_subnet : subnet.availability_zone_id ]
 }
@@ -126,4 +132,9 @@ resource "aws_route53_record" "aws-private-link-to-ccloud-zonal" {
       replace(aws_vpc_endpoint.aws-private-link-to-ccloud.dns_entry[0]["dns_name"], local.endpoint_prefix, "")
     )
   ]
+}
+
+output "availability_zone_map" {
+    description = "The AWS AZ ID map to these AZ names"
+    value = local.availability_zone_map
 }

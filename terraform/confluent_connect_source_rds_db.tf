@@ -25,7 +25,8 @@ resource "aws_lb" "rds_db" {
 
   enable_deletion_protection = false
   # Default is false. Enable if your cluster and your egress instances are in different AZs.
-  enable_cross_zone_load_balancing = true
+  enable_cross_zone_load_balancing = false
+  dns_record_client_routing_policy = "availability_zone_affinity"
 }
 
 resource "aws_lb_listener" "rds_db" {
@@ -66,21 +67,27 @@ data "aws_db_instance" "writer_instance" {
 data "aws_network_interface" "rds_writer_eni" {
   filter {
     name   = "description"
-    values = ["RDSNetworkInterface", "RDS ${data.aws_db_instance.writer_instance.db_instance_identifier}"]
+    values = ["RDSNetworkInterface"]
+    #values = ["RDSNetworkInterface", "RDS ${data.aws_db_instance.writer_instance.db_instance_identifier}"]
+  }
+  filter {
+    name   = "subnet-id"
+    #values = data.aws_db_instance.writer_instance.db_subnet_group_ids # or iterate via subnet info
+    values = aws_db_subnet_group.subnet_group.subnet_ids
   }
 
-  filter {
-    name   = "status"
-    values = ["in-use"]
-  }
+#  filter {
+#    name   = "status"
+#    values = ["in-use"]
+#  }
   depends_on = [ 
-    data.aws_db_instance.writer_instance
+    aws_rds_cluster_instance.rds_db
    ]
 }
 
-locals {
-  aws_rds_cluster_instance_rds_db_subnet = local.availability_zone_name_to_subnet_id[aws_rds_cluster_instance.rds_db.availability_zone]
-}
+#locals {
+#  aws_rds_cluster_instance_rds_db_subnet = local.availability_zone_name_to_subnet_id[aws_rds_cluster_instance.rds_db.availability_zone]
+#}
 
 resource "aws_vpc_endpoint_service" "rds_db" {
   network_load_balancer_arns = [aws_lb.rds_db.arn]
