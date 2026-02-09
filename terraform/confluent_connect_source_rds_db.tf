@@ -229,12 +229,15 @@ resource "confluent_connector" "postgre-sql-cdc-source" {
     "ssl.mode"                  = "prefer"
     "db.name"                   = var.database_name
     "database.server.name"      = "${local.resource_prefix}-rds-db"
-    "output.data.format"        = "AVRO",
+    "output.data.format"        = var.topic_format,
     "tasks.max"                 = "1",
     "db.timezone"               = "UTC",
     "table.include.list"        = ".*",
     #"table.exclude.list"        = ".*",
-    "topic.prefix"              = var.database_topic_profix
+    "topic.prefix"              = var.database_topic_profix,
+    # For all tables, the "timestamp" column is used for getting timestamps from
+    "timestamp.columns.mapping" = ".*:[timestamp]",
+    "mode"                      = "timestamp"
   }
 
   depends_on = [
@@ -420,5 +423,5 @@ output "database_api_secret" {
 
 output "database_connection" {
     description = "Instructions for manual connections to the database"
-    value = "Connect to the database by running: psql \"host=${aws_rds_cluster_instance.rds_db.endpoint} dbname=demo sslmode=prefer user=${var.database_username}  password=${var.database_password}\""
+    value = "Connect to the database by running: psql 'host=${aws_rds_cluster_instance.rds_db.endpoint} dbname=demo sslmode=prefer user=${var.database_username}  password=${var.database_password}'"
 }

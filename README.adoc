@@ -23,24 +23,53 @@ terraform apply
 ```
 
 You should be able to connect to the database instance following the instructions shown by the terraform output.
-
-Create a table with data:
+The database is pre-initalized with these statements:
 
 ```sql
-CREATE TABLE users (
-    user        char(20),
-    name        char(40),
-    givenname   char(40),
-    CONSTRAINT user_constraint PRIMARY KEY(user)
+CREATE TABLE IF NOT EXISTS users (
+    username TEXT PRIMARY KEY, 
+    given_name TEXT, 
+    family_name TEXT,
+    timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+INSERT INTO users VALUES('admin', 'Super', 'User', DEFAULT);
+INSERT INTO users VALUES('user', 'Regular', 'User', DEFAULT);
+```
+
+This makes sure the Kafka connector will find a first table and be able to consume from it.
+
+Add some extra rows:
+
+```sql
+INSERT INTO users VALUES('user2', 'Test', 'User', DEFAULT);
+INSERT INTO users VALUES('user3', 'Test', 'User', DEFAULT);
+```
+
+You can delete (all) rows as usual:
+
+```sql
+delete from users;
+```
+
+You can create another table with data:
+
+```sql
+CREATE TABLE IF NOT EXISTS postaladdress (
+    zipcode        VARCHAR(10),
+    city           VARCHAR(40),
+    street         VARCHAR(40),
+    house_number   VARCHAR(10),
+    country        VARCHAR(40),
+    extra_info     VARCHAR(100) DEFAULT '',
+    timestamp      TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT user_constraint PRIMARY KEY(zipcode, street, house_number, country)
 );
 ```
 
-Populate the table with data:
 
 ```sql
-
+INSERT INTO postaladdress VALUES('08002', 'Barcelona', 'Carrer dels Comtes', '2', 'Catalonia', DEFAULT);
 ```
-
 
 == Wrapping things up
 

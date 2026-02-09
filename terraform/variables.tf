@@ -164,8 +164,14 @@ variable "database_custom_service_name" {
 
 variable "database_topic_profix" {
     type = string
-    default = "rds-db"
+    default = "rdsdb-"
     description = "The topic prefix for the topic names to which the database connector will write"
+}
+
+variable "topic_format" {
+    type = string
+    default = "AVRO"
+    description = "The topic format. Using AVRO as default. Possible values are: AVRO, JSON, JSON_SR and PROTOBUF"
 }
 
 variable "use_ipv6" {
