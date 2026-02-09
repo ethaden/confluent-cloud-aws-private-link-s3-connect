@@ -30,6 +30,7 @@ locals {
   bootstrap_prefix = split(".", confluent_kafka_cluster.example_aws_private_link_cluster.bootstrap_endpoint)[0]
   zone_to_availability_zone_map = { for subnet in data.aws_subnet.vpc_subnet : subnet.id => subnet.availability_zone_id }
   availability_zone_name_to_subnet_id = { for subnet in data.aws_subnet.vpc_subnet : subnet.availability_zone => subnet.id }
+  availability_zone_id_to_subnet_id = { for subnet in data.aws_subnet.vpc_subnet : subnet.availability_zone_id => subnet.id }
   # Create mapping of AWS Zone IDS to zone names, this will look something like this:
   # availability_zone_map    = {
   #    + euc1-az1 = "eu-central-1c"

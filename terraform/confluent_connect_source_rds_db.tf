@@ -21,7 +21,10 @@ resource "aws_lb" "rds_db" {
   name               = "${local.resource_prefix}-rds-db-lb"
   internal           = true
   load_balancer_type = "network"
-  subnets            = toset(data.aws_subnets.vpc_subnets.ids)
+  # Assume single_availability and add the load balancer just to the same availability zone as the CCloud cluster
+  subnets            = [local.availability_zone_id_to_subnet_id[confluent_kafka_cluster.example_aws_private_link_cluster.dedicated[0].zones[0]]]
+  # Add LB to all availability zones
+  #subnets            = toset(data.aws_subnets.vpc_subnets.ids)
 
   enable_deletion_protection = false
   # Default is false. Enable if your cluster and your egress instances are in different AZs.
@@ -176,7 +179,7 @@ resource "confluent_api_key" "database_connector_key" {
 resource "confluent_role_binding" "database_service_account_developer_manage" {
   principal   = "User:${confluent_service_account.database_service_account.id}"
   role_name   = "DeveloperManage"
-  crn_pattern = "${confluent_kafka_cluster.example_aws_private_link_cluster.rbac_crn}/kafka=${confluent_kafka_cluster.example_aws_private_link_cluster.id}/topic=var.database_topic_profix*"
+  crn_pattern = "${confluent_kafka_cluster.example_aws_private_link_cluster.rbac_crn}/kafka=${confluent_kafka_cluster.example_aws_private_link_cluster.id}/topic=${var.database_topic_profix}*"
   lifecycle {
     prevent_destroy = false
   }
@@ -184,7 +187,7 @@ resource "confluent_role_binding" "database_service_account_developer_manage" {
 resource "confluent_role_binding" "database_service_account_developer_write" {
   principal   = "User:${confluent_service_account.database_service_account.id}"
   role_name   = "DeveloperWrite"
-  crn_pattern = "${confluent_kafka_cluster.example_aws_private_link_cluster.rbac_crn}/kafka=${confluent_kafka_cluster.example_aws_private_link_cluster.id}/topic=var.database_topic_profix*"
+  crn_pattern = "${confluent_kafka_cluster.example_aws_private_link_cluster.rbac_crn}/kafka=${confluent_kafka_cluster.example_aws_private_link_cluster.id}/topic=${var.database_topic_profix}*"
   lifecycle {
     prevent_destroy = false
   }
@@ -192,7 +195,7 @@ resource "confluent_role_binding" "database_service_account_developer_write" {
 resource "confluent_role_binding" "database_service_account_sr_manage" {
   principal   = "User:${confluent_service_account.database_service_account.id}"
   role_name   = "ResourceOwner"
-  crn_pattern = "${data.confluent_schema_registry_cluster.essentials.resource_name}/subject=var.database_topic_profix*"
+  crn_pattern = "${data.confluent_schema_registry_cluster.essentials.resource_name}/subject=${var.database_topic_profix}*"
   lifecycle {
     prevent_destroy = false
   }
