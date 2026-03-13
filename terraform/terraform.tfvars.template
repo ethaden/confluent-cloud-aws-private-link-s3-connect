@@ -11,3 +11,10 @@ database_password = "password"
 #use_ipv6 = false
 #aws_db_subnet_group_name = 
 resource_prefix = 
+# For DB2 running on an EC2 instance
+#database_db2_ec2_id = 
+# Typical DB2 port: 50000
+#database_port = 50000
+#database_username = "db2inst1"
+#database_password = "password"
+#database_name = "testdb"

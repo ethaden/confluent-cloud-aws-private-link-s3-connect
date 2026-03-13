@@ -179,3 +179,10 @@ variable "use_ipv6" {
     default = false
     description = "Set to true if using IPv6, false otherwise"
 }
+
+# When using DB2, community edition on an existing EC2 instance in docker
+variable "database_db2_ec2_id" {
+  type = string
+  default = ""
+  description = "The ID of an EC2 instance running DB2 community edition"
+}

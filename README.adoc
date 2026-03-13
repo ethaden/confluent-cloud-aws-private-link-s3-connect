@@ -71,6 +71,73 @@ CREATE TABLE IF NOT EXISTS postaladdress (
 INSERT INTO postaladdress VALUES('08002', 'Barcelona', 'Carrer dels Comtes', '2', 'Catalonia', DEFAULT);
 ```
 
+=== DB2
+
+For testing DB2, the folder `docker/db2-community-edition` contains a dockerized test environment.
+Change to that folder and run this command for setting things up:
+
+```console
+docker compose up -d
+```
+
+On your local machine you will have a DB2 community edition listening on Port 50000.
+
+Wait a little bit, then connect to the database management console:
+
+```console
+docker compose exec -ti db2 bash -c "su - db2inst1"
+```
+
+Or even easier:
+
+```console
+docker compose exec -u db2inst1 -ti db2 bash -i
+```
+
+
+If you don't see dozens of commands starting with "db2" when tabbing in the shell, log out and wait a bit longer.
+
+Then you can try connecting to the database:
+
+```console
+db2 connect to testdb
+```
+
+There might be error messages initially. Please be patient and try again after a while.
+
+```console
+docker compose exec -u db2inst1 -ti db2 bash -l -c "
+ db2 connect to testdb && \
+ db2 'CREATE TABLE IF NOT EXISTS users (username VARCHAR(50) NOT NULL PRIMARY KEY, given_name VARCHAR(50), family_name VARCHAR(50), timestamp TIMESTAMP NOT NULL WITH DEFAULT CURRENT TIMESTAMP)'
+"
+```
+
+Insert some values into the table:
+
+```console
+docker compose exec -u db2inst1 -ti db2 bash -l -c "
+ db2 connect to testdb && \
+ db2 \"INSERT INTO users VALUES ('root', 'Global', 'Administrator', DEFAULT)\" && \
+ db2 \"INSERT INTO users VALUES ('confluent', 'Demo', 'User', DEFAULT)\" && \
+ db2 \"INSERT INTO users VALUES ('test', 'Test', 'User', DEFAULT)\"
+"
+```
+
+===
+
+Continue with terraform: Please add the internal hostname of your EC2 instance running the dockerized DB2 test system, the port (default: Port 50000), as well as the database name, login (default: `db2inst1`) and password (default: `password`) to your tfvars file.
+
+=== Helpful commands
+
+If you want to delete (all!) rows from the database, run:
+
+```console
+docker compose exec -u db2inst1 -ti db2 bash -l -c "
+ db2 connect to testdb && \
+ db2 \"DELETE FROM users\"
+"
+```
+
 == Wrapping things up
 
 You can destroy all created resources including the cluster in Confluent Cloud by running the following command:
@@ -78,3 +145,10 @@ You can destroy all created resources including the cluster in Confluent Cloud b
 ```shell
 terraform destroy
 ```
+
+If you have started the DB2 instance in docker, go again to the folder `docker/db2-community-edition` and delete the database:
+
+```console
+docker compose down -v
+```
+Note: This will delete all data in the test database, too.
